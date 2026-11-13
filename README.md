@@ -16,18 +16,23 @@ MARK 59/
 │   │   ├── data/               # MT5 bridge, GexDash API client, models
 │   │   ├── patterns/           # Absorption, initiative, divergence detectors
 │   │   └── signals/            # Signal aggregation and trade execution logic
-│   ├── run_orderflow.bat       # Launcher for orderflow dashboard (Port 8080)
-│   └── pyproject.toml          # Engine dependencies and setup
+│   ├── requirements.txt        # Python package dependencies
+│   ├── pyproject.toml          # Package configuration
+│   ├── .env.example            # Environment configuration template
+│   └── run_orderflow.bat       # Auto-setup and launcher for orderflow dashboard (Port 8080)
 │
 ├── Mark-LVI/                   # JARVIS Voice AI Assistant
 │   ├── core/                   # Audio I/O, speech synthesis, hotword detection
 │   ├── plugins/                # Trading Mode & OrderFlow integration plugins
 │   ├── config/                 # Model configs, prompts, personalities
-│   └── run_jarvis.bat          # Launcher for voice assistant
+│   │   └── api_keys.json.example # API key template (Gemini, etc.)
+│   ├── requirements.txt        # Mark-LVI package dependencies
+│   ├── setup.py                # Automated environment setup script
+│   └── run_jarvis.bat          # Auto-setup and launcher for voice assistant
 │
-├── trading/                    # Execution routines and trading tools
-├── START_JARVIS.bat            # Master launch script
-└── .gitignore                  # Clean repository filters
+├── SETUP_ALL.bat               # One-click master installer for both environments
+├── START_JARVIS.bat            # Interactive master launch menu
+└── .gitignore                  # Clean repository filters (ignores secrets, db, venvs)
 ```
 
 ---
@@ -51,26 +56,78 @@ MARK 59/
 
 ---
 
-## Quick Start
+## Installation & Setup on a Fresh Machine
 
 ### Prerequisites
-- Python 3.11+
-- MetaTrader 5 (MT5) terminal logged into your broker account
-- Active Internet connection for GEXDash levels and MT5 feeds
+1. **Operating System**: Windows 10 or 11 (64-bit).
+2. **Python**: Python 3.10, 3.11, or 3.12 installed from [python.org](https://www.python.org/downloads/).
+   > **CRITICAL**: Make sure to check **"Add python.exe to PATH"** during Python installation!
+3. **MetaTrader 5 (MT5)**: Installed and logged into your broker account.
+4. **Git**: Installed from [git-scm.com](https://git-scm.com/).
 
-### Launching the System
-1. **Start the OrderFlow Dashboard:**
-   ```bat
-   cd "Analysis Pro"
-   run_orderflow.bat
-   ```
-   Open `http://localhost:8080` in your browser.
+---
 
-2. **Start the JARVIS Voice Assistant:**
-   ```bat
-   cd "Mark-LVI"
-   run_jarvis.bat
-   ```
+### Step 1: Clone the Repository
+```bash
+git clone https://github.com/TtmNahid/mark-59.git
+cd mark-59
+```
+
+---
+
+### Step 2: One-Click Environment Setup
+Double-click `SETUP_ALL.bat` in the root folder, or run:
+```bat
+SETUP_ALL.bat
+```
+This script will automatically:
+1. Create virtual environments (`.venv`) for both **Analysis Pro** and **Mark-LVI**.
+2. Install all required dependencies for both systems.
+3. Generate template configuration files (`.env` and `config/api_keys.json`).
+
+*Alternatively, simply double-clicking `START_JARVIS.bat`, `run_orderflow.bat`, or `run_jarvis.bat` will also detect if `.venv` is missing and automatically configure the environment!*
+
+---
+
+### Step 3: Configure API Keys (Optional)
+
+1. **GEXDash API Key (For Institutional GEX Levels)**:
+   - Either paste your API key directly in the web dashboard at `http://localhost:8080` (under the GEX API Configuration panel), OR
+   - Edit `Analysis Pro/.env`:
+     ```env
+     GEXDASH_API_KEY=your_key_here
+     ```
+
+2. **Gemini API Key (For JARVIS Voice AI)**:
+   - Edit `Mark-LVI/config/api_keys.json`:
+     ```json
+     {
+       "gemini": "your_gemini_api_key_here"
+     }
+     ```
+
+---
+
+## Running the System
+
+You can run everything via the Master Launcher:
+
+Double-click `START_JARVIS.bat`:
+```
+======================================================================
+                      JARVIS MARK 59 - MASTER LAUNCHER
+======================================================================
+
+  [1] Start OrderFlow Analysis Pro Dashboard (Port 8080)
+  [2] Start JARVIS Mark-LVI Voice AI Assistant
+  [3] Start BOTH (OrderFlow Dashboard + JARVIS Assistant)
+  [4] One-Click Setup / Reinstall Dependencies (SETUP_ALL.bat)
+  [5] Exit
+```
+
+Or run individual components:
+- **OrderFlow Dashboard**: Double-click `Analysis Pro\run_orderflow.bat` and open `http://localhost:8080`.
+- **JARVIS Voice Assistant**: Double-click `Mark-LVI\run_jarvis.bat`.
 
 ---
 

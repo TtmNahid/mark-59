@@ -8,6 +8,11 @@ version = "0.1.0"
 description = "Semi-automated orderflow trading alert system based on Fabio's methodology"
 requires-python = ">=3.10"
 dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
+    "httpx>=0.27.0",
+    "MetaTrader5>=5.0.0; sys_platform == 'win32'",
+    "pydantic>=2.0.0",
     "websockets>=12.0",
     "aiohttp>=3.9",
     "pandas>=2.1",
@@ -15,7 +20,6 @@ dependencies = [
     "scipy>=1.12",
     "python-telegram-bot>=21.0",
     "plotly>=5.18",
-    "kaleido>=0.2.1",
     "aiosqlite>=0.19",
     "pytz>=2024.1",
     "pyyaml>=6.0",
