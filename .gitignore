@@ -1,0 +1,60 @@
+# Virtual environments
+.venv/
+*/.venv/
+env/
+venv/
+ENV/
+
+# Python cache & compiled files
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+*/*/*/__pycache__/
+*.py[cod]
+*$py.class
+
+# Databases & local state
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+*/logs/
+*.log.*
+
+# Node / JS dependencies
+node_modules/
+*/node_modules/
+
+# Portable Git binaries & backups
+git/
+/git/
+.git_sub_bak/
+*.git_sub_bak/
+*_sub_bak/
+
+# Sensitive env and key files
+.env
+*/.env
+!.env.example
+!*/.env.example
+
+Mark-LVI/config/api_keys.json
+api_keys.json
+!api_keys.json.example
+!*/api_keys.json.example
+
+# Temporary scripts
+upload_to_github.py
+do_push.py
+test_*.py
+check_*.py
+
+# OS / Editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
