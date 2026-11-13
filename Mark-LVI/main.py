@@ -966,10 +966,11 @@ class JarvisLive:
     def _on_text_command(self, text: str):
         if not self._loop or not self.session:
             return
-        # Respect wake-word sleep: a typed command must not be answered while
-        # asleep either (the sleep gate is not just for the mic). Wake first with
-        # "Hey Jarvis" or the WAKE NOW button.
-        if self._wake_enabled and not self._awake:
+        # If a file or folder was dropped/uploaded, wake JARVIS immediately
+        if text.startswith(("[FILE_UPLOADED]", "[FOLDER_UPLOADED]")):
+            if self._wake_enabled and not self._awake:
+                self.wake(reason="file uploaded")
+        elif self._wake_enabled and not self._awake:
             self.ui.write_log("SYS: I'm asleep — say 'Hey Jarvis' or tap WAKE NOW first.")
             return
         asyncio.run_coroutine_threadsafe(
@@ -1434,8 +1435,11 @@ class JarvisLive:
 
             elif self._action_registry.has(name):
                 # file_processor: fall back to the currently-uploaded file when none is given
-                if name == "file_processor" and not args.get("file_path") and self.ui.current_file:
-                    args["file_path"] = self.ui.current_file
+                if name == "file_processor" and not args.get("file_path"):
+                    if self.ui.current_file:
+                        args["file_path"] = self.ui.current_file
+                    elif self._dashboard and getattr(self._dashboard, "_last_uploaded_file", None):
+                        args["file_path"] = self._dashboard._last_uploaded_file
                 # dev_agent: a folder in the upload box is where the work goes.
                 #
                 # Decided HERE, not left to the model. Told plainly in the tool
@@ -2422,6 +2426,7 @@ class JarvisLive:
         try:
             from dashboard.server import DashboardServer
             self._dashboard = DashboardServer()
+            self._dashboard.set_ui(self.ui)
             self._dashboard.set_connect_callback(self._on_phone_connected)
             asyncio.create_task(self._dashboard.serve())
             # Runs for the whole lifetime, not just inside an active session

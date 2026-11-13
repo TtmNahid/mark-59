@@ -93,7 +93,7 @@ def _process_image(path: Path, action: str, params: dict, speak=None) -> str:
 
     action = action or "describe"
 
-    if action in ("describe", "ocr", "analyze", "read", "extract_text"):
+    if action in ("describe", "ocr", "analyze", "read", "extract_text") or params.get("instruction") or params.get("query"):
         try:
             model  = _gemini_client()
             img    = Image.open(path)
@@ -103,10 +103,11 @@ def _process_image(path: Path, action: str, params: dict, speak=None) -> str:
                 "analyze":  "Analyze this image thoroughly: objects, colors, composition, any text, context.",
                 "read":     "Read all text in this image, preserving structure and formatting.",
                 "extract_text": "Extract all text from this image.",
-            }.get(action, "Describe this image.")
+            }.get(action, "Describe this image in detail.")
 
-            if params.get("instruction"):
-                prompt = params["instruction"]
+            instruction = params.get("instruction") or params.get("query") or params.get("question")
+            if instruction:
+                prompt = f"Please inspect this image '{path.name}' and answer: {instruction}"
 
             response = model.generate_content([prompt, img])
             result   = response.text.strip()
@@ -179,47 +180,67 @@ def _process_image(path: Path, action: str, params: dict, speak=None) -> str:
 
 def _process_pdf(path: Path, action: str, params: dict, speak=None) -> str:
     action = action or "summarize"
+    instruction = params.get("instruction") or params.get("query") or params.get("question") or ""
 
-    def _extract_pdf_text(max_chars=50000) -> str:
-        text = ""
+    if action in ("summarize", "extract_text", "translate_hint", "analyze", "reformat", "read", "describe") or instruction:
+        if instruction:
+            prompt = f"Please read this PDF document '{path.name}' and address the user's request: {instruction}"
+        elif action == "summarize":
+            prompt = f"Summarize this PDF document '{path.name}' concisely with key findings, sections, and takeaways."
+        elif action == "extract_text":
+            prompt = "Extract and transcribe all readable text from this PDF document preserving structure."
+        elif action == "translate_hint":
+            prompt = "What language is this PDF in and what does it discuss? Summarize in English."
+        else:
+            prompt = f"Analyze this PDF document '{path.name}' thoroughly, detailing all content, tables, and sections."
+
+        # 1. Native Gemini PDF reasoning (reads scanned pages, tables, formatting natively)
         try:
-            import pdfplumber
-            with pdfplumber.open(path) as pdf:
-                for page in pdf.pages:
-                    text += (page.extract_text() or "") + "\n"
-        except ImportError:
-            try:
-                import PyPDF2
-                with open(path, "rb") as f:
-                    reader = PyPDF2.PdfReader(f)
-                    for page in reader.pages:
-                        text += page.extract_text() + "\n"
-            except ImportError:
-                return ""
-        return text[:max_chars]
+            from google.genai import types
+            model = _gemini_client()
+            pdf_bytes = path.read_bytes()
+            if len(pdf_bytes) <= 25 * 1024 * 1024:
+                part = types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")
+                response = model.generate_content([prompt, part])
+                result = response.text.strip()
+                if action == "extract_text" or (len(result) > 600 and params.get("save", True)):
+                    out = _output_path(path, action or "summary", ".txt")
+                    out.write_text(result, encoding="utf-8")
+                    return f"{result[:400]}...\n\nFull result saved: {out.name}"
+                return result
+        except Exception as e:
+            print(f"[FileProcessor] Native PDF call exception: {e}, falling back to local extraction...")
 
-    if action in ("summarize", "extract_text", "translate_hint", "analyze", "reformat"):
+        # 2. Local fallback text extraction via pdfplumber / PyPDF2
+        def _extract_pdf_text(max_chars=50000) -> str:
+            text = ""
+            try:
+                import pdfplumber
+                with pdfplumber.open(path) as pdf:
+                    for page in pdf.pages:
+                        text += (page.extract_text() or "") + "\n"
+            except ImportError:
+                try:
+                    import PyPDF2
+                    with open(path, "rb") as f:
+                        reader = PyPDF2.PdfReader(f)
+                        for page in reader.pages:
+                            text += page.extract_text() + "\n"
+                except ImportError:
+                    return ""
+            return text[:max_chars]
+
         text = _extract_pdf_text()
         if not text.strip():
-            return "Could not extract text from PDF (may be scanned/image-based)."
+            return "Could not extract readable text from PDF and native analysis was unavailable."
 
-        if action == "extract_text":
-            out = _output_path(path, "text", ".txt")
-            out.write_text(text, encoding="utf-8")
-            return f"Text extracted ({len(text)} chars). Saved: {out.name}"
-
-        prompt_map = {
-            "summarize":      f"Summarize this PDF document concisely:\n\n{text}",
-            "analyze":        f"Analyze this document thoroughly:\n\n{text}",
-            "translate_hint": f"What language is this document in and what does it say? Summarize:\n\n{text}",
-            "reformat":       f"Reformat this text cleanly with proper structure:\n\n{text}",
-        }
         try:
-            model    = _gemini_client()
-            response = model.generate_content(prompt_map.get(action, f"Analyze:\n\n{text}"))
-            result   = response.text.strip()
+            model = _gemini_client()
+            full_prompt = f"{prompt}\n\nDocument Text:\n{text}"
+            response = model.generate_content(full_prompt)
+            result = response.text.strip()
             if len(result) > 600 and params.get("save", True):
-                out = _output_path(path, action, ".txt")
+                out = _output_path(path, action or "summary", ".txt")
                 out.write_text(result, encoding="utf-8")
                 return f"{result[:400]}...\n\nFull result saved: {out.name}"
             return result
@@ -784,16 +805,81 @@ def _process_pptx(path: Path, action: str, params: dict, speak=None) -> str:
 from core import outcome
 
 
+def _resolve_file_path(file_path_str: str, player=None) -> Path | None:
+    """Robustly find the target file:
+    1. Direct path if valid.
+    2. Search in JARVIS Uploads, Downloads, Desktop, or project uploads.
+    3. If empty, check currently active file on the UI.
+    4. Fall back to the most recently uploaded file in upload directories.
+    """
+    if file_path_str and file_path_str.strip():
+        raw = file_path_str.strip().strip('"').strip("'")
+        p = Path(raw)
+        if p.exists() and p.is_file():
+            return p
+
+        # Check standard candidate directories
+        candidates = [
+            Path.home() / "Downloads" / "JARVIS Uploads" / p.name,
+            Path.home() / "Documents" / "JARVIS Uploads" / p.name,
+            Path(__file__).resolve().parent.parent / "uploads" / p.name,
+            Path.home() / "Downloads" / p.name,
+            Path.home() / "Desktop" / p.name,
+        ]
+        for c in candidates:
+            if c.exists() and c.is_file():
+                return c
+
+        # Case-insensitive filename search in upload dirs
+        for udir in [
+            Path.home() / "Downloads" / "JARVIS Uploads",
+            Path.home() / "Documents" / "JARVIS Uploads",
+            Path(__file__).resolve().parent.parent / "uploads",
+        ]:
+            if udir.exists() and udir.is_dir():
+                for f in udir.iterdir():
+                    if f.is_file() and f.name.lower() == p.name.lower():
+                        return f
+
+    # Check UI/player active file
+    if player:
+        cf = getattr(player, "current_file", None) or getattr(player, "_current_file", None)
+        if callable(cf):
+            try:
+                cf = cf()
+            except Exception:
+                cf = None
+        if cf and isinstance(cf, (str, Path)):
+            cp = Path(cf)
+            if cp.exists() and cp.is_file():
+                return cp
+
+    # Fall back to the most recently added file in JARVIS Uploads
+    search_dirs = [
+        Path.home() / "Downloads" / "JARVIS Uploads",
+        Path.home() / "Documents" / "JARVIS Uploads",
+        Path(__file__).resolve().parent.parent / "uploads",
+    ]
+    all_files = []
+    for d in search_dirs:
+        if d.exists() and d.is_dir():
+            for f in d.iterdir():
+                if f.is_file():
+                    all_files.append(f)
+    if all_files:
+        all_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        return all_files[0]
+
+    return None
+
+
 def file_processor(parameters: dict, player=None, speak=None) -> str:
     file_path_str = parameters.get("file_path", "").strip()
-    if not file_path_str:
-        return "No file path provided."
-
-    path = Path(file_path_str)
-    if not path.exists():
-        return f"File not found: {file_path_str}"
+    path = _resolve_file_path(file_path_str, player)
+    if not path:
+        return "No uploaded file found. Please upload or drop a photo or document onto JARVIS first."
     if not path.is_file():
-        return f"Path is not a file: {file_path_str}"
+        return f"Path is not a valid file: {path}"
 
     file_type   = _detect_type(path)
     action      = (parameters.get("action") or "").lower().strip()

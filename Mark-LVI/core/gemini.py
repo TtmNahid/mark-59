@@ -156,20 +156,16 @@ PROVIDER_PREFIX = "prov:"
 # cooldown after one attempt instead of being paid for on every call.
 _LADDERS = {
     FAST: (LIVE,
-           "gemini-2.5-flash-lite", "gemini-3.5-flash-lite",
-           "gemini-3.1-flash-lite", "gemini-flash-lite-latest",
-           "gemini-2.5-flash", "gemini-3.5-flash",
-           "gemini-3.6-flash", "gemini-3-flash-preview"),
+           "gemini-3.8-flash", "gemini-3.1-flash-lite",
+           "gemini-3.5-flash-lite", "gemini-flash-lite-latest",
+           "gemini-3.5-flash"),
     SMART: (LIVE,
-            "gemini-2.5-flash", "gemini-3.5-flash",
-            "gemini-2.5-flash-lite", "gemini-3.5-flash-lite",
-            "gemini-3.1-flash-lite",
-            "gemini-3.6-flash", "gemini-3-flash-preview", "gemini-flash-latest"),
+            "gemini-3.8-flash", "gemini-3.1-flash-lite",
+            "gemini-3.5-flash-lite", "gemini-3.5-flash"),
     # Grounded search needs response.candidates[...].grounding_metadata, which a
     # Live turn does not produce. REST only, and it says so rather than silently
     # returning an answer with no sources behind it.
-    SEARCH: ("gemini-2.5-flash", "gemini-3.5-flash", "gemini-2.5-flash-lite",
-             "gemini-flash-latest"),
+    SEARCH: ("gemini-3.8-flash", "gemini-3.1-flash-lite", "gemini-3.5-flash"),
 }
 
 # The conversation's own model, and ONE careful fallback behind it.
@@ -368,8 +364,8 @@ def _live_model() -> str:
 
 def _to_live_parts(contents) -> list:
     """REST `contents` -> Live `parts`. Accepts a bare string, a list of
-    strings, and the SDK's Part objects (which is how every image is passed
-    here), because those are the three shapes the call sites actually use."""
+    strings, PIL images, and the SDK's Part objects (which is how images are passed
+    here), ensuring images and text are properly formatted for live/REST turns."""
     import base64
 
     items = contents if isinstance(contents, (list, tuple)) else [contents]
@@ -377,6 +373,16 @@ def _to_live_parts(contents) -> list:
     for item in items:
         if isinstance(item, str):
             parts.append({"text": item})
+            continue
+        # Support PIL Image instances directly
+        if hasattr(item, "save") and hasattr(item, "size"):
+            import io
+            buf = io.BytesIO()
+            fmt = "PNG" if getattr(item, "mode", "RGB") == "RGBA" else "JPEG"
+            mime = "image/png" if fmt == "PNG" else "image/jpeg"
+            item.save(buf, format=fmt)
+            b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+            parts.append({"inline_data": {"mime_type": mime, "data": b64}})
             continue
         blob = getattr(item, "inline_data", None)
         if blob is not None:
@@ -396,33 +402,8 @@ def _to_live_parts(contents) -> list:
 
 
 def _carries_recording(contents) -> bool:
-    """True when the request holds a sound or video file rather than text or a
-    still image.
-
-    Two rungs of the ladder cannot take one, for reasons that are permanent
-    rather than temporary, so neither should be asked:
-
-      LIVE     answers a recording with 1008 "not implemented, or supported, or
-               enabled" — it wants audio streamed through realtimeInput, not a
-               finished file in a turn. Measured: about 1.5s spent connecting a
-               session that was always going to refuse, paid on EVERY such call,
-               because the message matches none of the cooldown patterns and
-               therefore nothing is ever learned from it.
-
-      prov:    `providers.llm_openai.parts_to_openai` turns every inline_data
-               payload into an `image_url` data URI, which is right for the
-               images this app actually sends and wrong for a sound file. The
-               endpoint would reject it, or — worse — accept it and describe
-               nothing.
-
-    Still images are deliberately NOT included: they are what the vision path
-    sends, both rungs handle them, and excluding them would undo the feature
-    this ladder was built around.
-
-    Costs nothing on the calls that already exist. Every one of them passes a
-    string or a list holding text and at most one image, so this returns on the
-    first isinstance check or after one short loop.
-    """
+    """True when the request holds a sound or video file or a raw PDF rather than text or a
+    still image."""
     if isinstance(contents, str):
         return False
     items = contents if isinstance(contents, (list, tuple)) else [contents]
@@ -437,7 +418,7 @@ def _carries_recording(contents) -> bool:
             inline = item.get("inline_data") or item.get("inlineData")
             if isinstance(inline, dict):
                 mime = inline.get("mime_type") or inline.get("mimeType")
-        if isinstance(mime, str) and mime.startswith(("audio/", "video/")):
+        if isinstance(mime, str) and (mime.startswith(("audio/", "video/")) or mime == "application/pdf"):
             return True
     return False
 

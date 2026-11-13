@@ -735,12 +735,17 @@ class DashboardServer:
         self._device_sessions: dict[str, dict] = {}  # device_token → {session_key}
         self._phone_audio_queue: asyncio.Queue    = asyncio.Queue(maxsize=200)
         self._uploads_dir                 = UPLOADS_DIR
+        self._last_uploaded_file: str | None = None
+        self._ui                          = None
         # Set by serve() when the port could not be taken, so the UI can say
         # why the QR code leads nowhere instead of showing it regardless.
         self._bind_error: str = ""
         self._login_html                  = _read("login.html")
         self._app_html                    = _read("app.html")
         self.app                          = self._build_app()
+
+    def set_ui(self, ui) -> None:
+        self._ui = ui
 
     # ── one-time key management ───────────────────────────────────────────
 
@@ -1111,6 +1116,23 @@ class DashboardServer:
                     except Exception:
                         pass
                     return JSONResponse({"error": str(exc)}, status_code=500)
+
+                self._last_uploaded_file = str(dest)
+                if getattr(self, "_ui", None):
+                    try:
+                        self._ui._set_file(str(dest))
+                    except Exception:
+                        pass
+
+                size_str = f"{size/1024:.1f} KB" if size < 1024*1024 else f"{size/(1024*1024):.1f} MB"
+                notif = (
+                    f"[FILE_UPLOADED] path={dest.resolve()} | name={dest.name} | "
+                    f"type={dest.suffix.lstrip('.')} | size={size_str} | "
+                    f"The user uploaded '{dest.name}'. Acknowledge in one short sentence that you have received '{dest.name}' and ask what they would like to do with it."
+                )
+                await self._command_queue.put(notif)
+                if self._wake_callback:
+                    self._wake_callback()
 
                 asyncio.create_task(self.broadcast({
                     "type": "file_received",
