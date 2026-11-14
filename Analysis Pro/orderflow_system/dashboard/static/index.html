@@ -85,6 +85,11 @@
                 <span class="nav-icon">🎯</span>
                 <span class="nav-label">GEX Levels</span>
             </button>
+            <button class="nav-item" data-view="intelligence" title="JARVIS Trading Intelligence Learning Engine">
+                <span class="nav-icon">🧠</span>
+                <span class="nav-label">Trading Intelligence</span>
+                <span class="badge-intel-live">AI</span>
+            </button>
 
             <div class="nav-section-title">Extensions</div>
             <div class="nav-item nav-item-future" title="Market Profile (Planned Expansion)">
@@ -276,6 +281,273 @@
                     </div>
                 </div>
             </div>
+
+            <!-- ═══ View 4: JARVIS Trading Intelligence Learning Engine ═══ -->
+            <div id="viewIntelligence" class="dashboard-view" style="display:none;">
+                <div class="intel-container">
+                    <!-- Top Subnav & Global Status -->
+                    <div class="intel-header-bar">
+                        <div class="intel-header-title">
+                            <span class="intel-logo-icon">🧠</span>
+                            <div>
+                                <div class="intel-title-text">TRADING INTELLIGENCE</div>
+                                <div class="intel-subtitle-text">Self-Learning Institutional Knowledge Base &amp; Trade Journal</div>
+                            </div>
+                        </div>
+                        <div class="intel-subnav">
+                            <button class="intel-tab-btn active" data-subtab="library">📚 Knowledge Library</button>
+                            <button class="intel-tab-btn" data-subtab="reader">📖 PDF Reader</button>
+                            <button class="intel-tab-btn" data-subtab="teach">🎓 Teach Mode</button>
+                            <button class="intel-tab-btn" data-subtab="memory">🧠 Learning Memory</button>
+                            <button class="intel-tab-btn" data-subtab="approved">🛡️ Approved Lessons</button>
+                            <button class="intel-tab-btn" data-subtab="history">📜 History &amp; Journal</button>
+                        </div>
+                        <div class="intel-stats-badge" id="intelStatsBadge">
+                            <span id="intelStatDocs">0 Docs</span> • <span id="intelStatLessons">0 Approved Lessons</span>
+                        </div>
+                    </div>
+
+                    <!-- Subtab 1: Knowledge Library -->
+                    <div id="intelSubtabLibrary" class="intel-tab-content active">
+                        <div class="intel-upload-panel">
+                            <div class="intel-panel-header">
+                                <span class="panel-title">DOCUMENT INGESTION &amp; EXTRACTION</span>
+                                <div style="display:flex; gap:8px; align-items:center;">
+                                    <label style="font-size:11px; color:var(--text-muted);">Target Category:</label>
+                                    <select id="intelCategorySelect" class="terminal-select"></select>
+                                    <button id="intelBtnAddCategory" class="intel-mini-btn" title="Add New Category">+ New Category</button>
+                                </div>
+                            </div>
+                            <div class="intel-dropzone" id="intelDropZone">
+                                <input type="file" id="intelFileInput" accept=".pdf,.docx,.txt,.csv,image/*" style="display:none;" />
+                                <div class="drop-icon">📤</div>
+                                <div class="drop-title">Click or Drag &amp; Drop Trading Files Here</div>
+                                <div class="drop-sub">Supported formats: PDF (Full Books/Guides), DOCX, TXT, CSV, Screenshots (PNG/JPG)</div>
+                            </div>
+                            <div id="intelUploadProgress" class="intel-progress-bar-wrap" style="display:none;">
+                                <div class="intel-progress-status" id="intelUploadStatusText">Extracting concepts with Gemini...</div>
+                                <div class="intel-progress-track">
+                                    <div class="intel-progress-fill" id="intelProgressBar" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="intel-library-section">
+                            <div class="intel-section-header">
+                                <span class="panel-title">CATALOGED KNOWLEDGE ASSETS</span>
+                                <div class="intel-filter-wrap">
+                                    <select id="intelFilterCategory" class="terminal-select">
+                                        <option value="">All Categories</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="intel-grid" id="intelLibraryGrid">
+                                <div class="intel-empty-card">
+                                    <span class="intel-empty-icon">📂</span>
+                                    <div class="intel-empty-title">Loading Knowledge Assets...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subtab 2: PDF & Document Reader -->
+                    <div id="intelSubtabReader" class="intel-tab-content" style="display:none;">
+                        <div class="intel-reader-layout">
+                            <div class="intel-reader-left">
+                                <div class="intel-reader-selector-bar">
+                                    <label style="font-size:12px; font-weight:600; color:var(--cyan);">SELECT DOCUMENT:</label>
+                                    <select id="intelReaderDocSelect" class="terminal-select" style="flex:1;">
+                                        <option value="">-- Select a Document to Explore --</option>
+                                    </select>
+                                </div>
+
+                                <div class="intel-doc-meta-card">
+                                    <div class="meta-row">
+                                        <h3 id="intelReaderDocTitle" style="margin:0; font-size:16px; color:#fff;">No Document Selected</h3>
+                                        <span id="intelReaderDocCategory" class="cat-pill">Category</span>
+                                    </div>
+                                    <div class="meta-summary-box" id="intelReaderDocSummary">
+                                        Select an ingested PDF or document from the dropdown above to view extracted concepts, methodologies, and rules.
+                                    </div>
+                                </div>
+
+                                <div class="intel-concepts-header">
+                                    <span class="panel-title">EXTRACTED CONCEPTS &amp; METHODOLOGY</span>
+                                </div>
+                                <div class="intel-concepts-scroll" id="intelReaderConceptsList">
+                                    <div style="color:var(--text-muted); font-size:12px; padding:20px; text-align:center;">
+                                        Select a document to view structured trading rules and concepts.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="intel-reader-right">
+                                <div class="panel-header">
+                                    <span class="panel-title">DOCUMENT-GROUNDED Q&amp;A (RAG)</span>
+                                </div>
+                                <div class="reader-qa-history" id="intelReaderQaHistory">
+                                    <div class="qa-msg ai">
+                                        <div class="qa-speaker">🧠 MARK 59</div>
+                                        <div class="qa-body">Select a document on the left and ask questions. I answer strictly based on the source text with page citations.</div>
+                                    </div>
+                                </div>
+                                <div class="reader-qa-input-bar">
+                                    <input type="text" id="intelReaderQaInput" class="qa-text-input" placeholder="Ask about this document's rules, absorption setups, GEX..." />
+                                    <button id="intelReaderBtnAsk" class="qa-send-btn">Ask AI</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subtab 3: Teach Mode -->
+                    <div id="intelSubtabTeach" class="intel-tab-content" style="display:none;">
+                        <div class="intel-teach-layout">
+                            <div class="teach-input-card">
+                                <div class="panel-header">
+                                    <span class="panel-title">CONVERSATIONAL TEACH MODE</span>
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <label style="font-size:11px; color:var(--text-muted);">Topic Category:</label>
+                                        <select id="intelTeachCategory" class="terminal-select"></select>
+                                    </div>
+                                </div>
+                                <p class="teach-instruction">
+                                    Explain a trading concept, footprint setup, or why you entered a trade. Mark 59 will analyze your reasoning, check against prior lessons, propose formal trading rules, and ask for your approval.
+                                </p>
+                                <textarea id="intelTeachInput" class="teach-textarea" rows="6" placeholder="Example: This is absorption at an important support level. Buyers are absorbing aggressive selling..."></textarea>
+                                
+                                <div class="teach-controls-row">
+                                    <input type="file" id="intelTeachChartInput" accept="image/*" style="display:none;" />
+                                    <button id="intelTeachBtnAttach" class="teach-btn-secondary">📎 Attach Chart Screenshot</button>
+                                    <span id="intelTeachAttachedBadge" class="teach-attached-badge" style="display:none;"></span>
+                                    <button id="intelTeachBtnAnalyze" class="teach-btn-primary">🧠 Analyze with Mark 59</button>
+                                </div>
+
+                                <div id="intelTeachLoading" class="teach-loading-indicator" style="display:none;">
+                                    <span class="spinner-dot"></span> Analyzing trading logic, comparing against institutional playbook...
+                                </div>
+                            </div>
+
+                            <!-- Proposed Lesson Approval Card -->
+                            <div id="intelTeachResultCard" class="teach-proposal-card" style="display:none;">
+                                <div class="teach-proposal-header">
+                                    <div>
+                                        <span class="teach-proposal-tag">PROPOSED LESSON</span>
+                                        <h3 id="intelTeachResultTitle" style="margin:6px 0 0 0; color:var(--cyan);">Lesson Title</h3>
+                                    </div>
+                                    <span id="intelTeachResultCategory" class="cat-pill">Category</span>
+                                </div>
+
+                                <div class="teach-proposal-section">
+                                    <div class="teach-section-label">MARK 59 COMPREHENSION:</div>
+                                    <div id="intelTeachResultUnderstanding" class="teach-understanding-box"></div>
+                                </div>
+
+                                <div class="teach-proposal-section">
+                                    <div class="teach-section-label">PLAYBOOK COMPARISON &amp; HARMONY:</div>
+                                    <div id="intelTeachResultComparison" class="teach-comparison-box"></div>
+                                </div>
+
+                                <div id="intelTeachResultClarifications" class="teach-clarification-box" style="display:none;"></div>
+                                <div id="intelTeachResultRules" class="teach-rules-box"></div>
+                                <div id="intelTeachResultExamples" class="teach-examples-box"></div>
+
+                                <div class="teach-actions-row">
+                                    <button id="intelTeachBtnRevise" class="teach-btn-secondary">✏️ Revise Explanation</button>
+                                    <button id="intelTeachBtnApprove" class="teach-btn-approve">🛡️ Approve &amp; Save to Playbook</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subtab 4: Learning Memory -->
+                    <div id="intelSubtabMemory" class="intel-tab-content" style="display:none;">
+                        <div class="intel-memory-panel">
+                            <div class="intel-panel-header">
+                                <span class="panel-title">PERSISTENT MEMORY REPOSITORY</span>
+                                <div class="memory-filters">
+                                    <input type="text" id="intelMemorySearch" class="memory-search-input" placeholder="Search rules, concepts..." />
+                                    <select id="intelMemoryCategoryFilter" class="terminal-select">
+                                        <option value="">All Categories</option>
+                                    </select>
+                                    <select id="intelMemoryStatusFilter" class="terminal-select">
+                                        <option value="">All Statuses</option>
+                                        <option value="approved">Approved</option>
+                                        <option value="pending">Pending</option>
+                                        <option value="rejected">Rejected</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="memory-table-wrap">
+                                <table class="memory-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Rule / Concept</th>
+                                            <th>Category</th>
+                                            <th>Status</th>
+                                            <th>Version</th>
+                                            <th>Date</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="intelMemoryTableBody">
+                                        <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">Loading memory...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subtab 5: Approved Lessons -->
+                    <div id="intelSubtabApproved" class="intel-tab-content" style="display:none;">
+                        <div class="intel-approved-panel">
+                            <div class="intel-panel-header">
+                                <span class="panel-title">VERIFIED INSTITUTIONAL TRADING PLAYBOOK</span>
+                                <div class="intel-filter-wrap">
+                                    <select id="intelApprovedCategoryFilter" class="terminal-select">
+                                        <option value="">All Categories</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="approved-grid" id="intelApprovedList">
+                                <div class="intel-empty-card">
+                                    <span class="intel-empty-icon">🛡️</span>
+                                    <div class="intel-empty-title">Loading Approved Rules...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subtab 6: History & Trade Journal -->
+                    <div id="intelSubtabHistory" class="intel-tab-content" style="display:none;">
+                        <div class="intel-history-layout">
+                            <div class="intel-history-left">
+                                <div class="intel-panel-header">
+                                    <span class="panel-title">SYSTEM AUDIT TRAIL</span>
+                                    <div style="display:flex; gap:8px;">
+                                        <button id="intelBtnBackup" class="intel-mini-btn" title="Export JSON database backup">💾 Export Backup</button>
+                                        <input type="file" id="intelRestoreFileInput" accept=".json" style="display:none;" />
+                                        <button class="intel-mini-btn" onclick="document.getElementById('intelRestoreFileInput').click()" title="Restore from JSON backup">📥 Restore</button>
+                                    </div>
+                                </div>
+                                <div class="audit-log-list" id="intelAuditLogList">
+                                    <div style="color:var(--text-muted); font-size:12px;">Loading activity history...</div>
+                                </div>
+                            </div>
+
+                            <div class="intel-history-right">
+                                <div class="intel-panel-header">
+                                    <span class="panel-title">PERSONAL TRADE LEARNING (MODULE 5)</span>
+                                    <button id="intelBtnLogTrade" class="intel-mini-btn primary">+ Log Trade Entry</button>
+                                </div>
+                                <div class="trades-journal-list" id="intelTradesList">
+                                    <div style="color:var(--text-muted); font-size:12px;">Loading trade learning journal...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
@@ -324,5 +596,6 @@
 
     <script src="/static/footprint.js?v=9"></script>
     <script src="/static/app.js?v=9"></script>
+    <script src="/static/intelligence.js?v=1"></script>
 </body>
 </html>

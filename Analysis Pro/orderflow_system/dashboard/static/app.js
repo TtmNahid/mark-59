@@ -1205,6 +1205,7 @@ function switchView(viewName) {
         'chart': document.getElementById('viewChart'),
         'footprint': document.getElementById('viewFootprint'),
         'gex': document.getElementById('viewGex'),
+        'intelligence': document.getElementById('viewIntelligence'),
     };
 
     for (const [key, el] of Object.entries(views)) {
@@ -1222,6 +1223,10 @@ function switchView(viewName) {
         initOrUpdateFootprint();
     } else if (viewName === 'gex') {
         loadGexData(state.activeSymbol);
+    } else if (viewName === 'intelligence') {
+        if (window.JARVIS_INTEL && window.JARVIS_INTEL.refresh) {
+            window.JARVIS_INTEL.refresh();
+        }
     }
 }
 

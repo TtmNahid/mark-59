@@ -303,11 +303,20 @@ class OrderflowSystem:
                 dashboard_app,
                 host=DASHBOARD.host,
                 port=DASHBOARD.port,
-                log_level=DASHBOARD.log_level,
+                log_level="info",
                 loop="none",
             )
             uvi_server = uvicorn.Server(uvi_config)
-            feed_tasks.append(uvi_server.serve())
+
+            async def run_dashboard_supervised():
+                try:
+                    logger.info(f"Dashboard supervised task starting at http://{DASHBOARD.host}:{DASHBOARD.port}")
+                    await uvi_server.serve()
+                    logger.warning(f"uvicorn serve() returned! started={uvi_server.started}, should_exit={uvi_server.should_exit}")
+                except Exception as e:
+                    logger.error(f"uvicorn exception: {e}", exc_info=True)
+
+            feed_tasks.append(run_dashboard_supervised())
             logger.info(f"Dashboard enabled at http://{DASHBOARD.host}:{DASHBOARD.port}")
 
         # Run feed(s) + periodic tasks + dashboard concurrently

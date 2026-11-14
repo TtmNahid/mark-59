@@ -43,6 +43,14 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Trading Intelligence Learning Engine
+try:
+    from orderflow_system.intelligence.router import router as intelligence_router
+    app.include_router(intelligence_router)
+    logger.info("Trading Intelligence Learning Engine router registered.")
+except Exception as e:
+    logger.error(f"Failed to register Trading Intelligence router: {e}")
+
 # WebSocket manager — shared with main.py
 ws_manager = WebSocketManager()
 
