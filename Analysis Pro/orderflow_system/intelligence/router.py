@@ -25,6 +25,7 @@ from orderflow_system.intelligence.models import (
     DocumentAskRequest,
     TradeLearningRecord,
     KnowledgeCategory,
+    LessonRecord,
 )
 
 logger = logging.getLogger(__name__)
@@ -230,6 +231,46 @@ async def approve_existing_lesson(lesson_id: str):
 async def reject_existing_lesson(lesson_id: str):
     ok = db.reject_lesson(lesson_id)
     return {"ok": ok}
+
+
+@router.post("/lesson/{lesson_id}")
+async def update_lesson_endpoint(lesson_id: str, payload: dict):
+    reason = payload.pop("change_reason", "Lesson revised")
+    updated = db.update_lesson(lesson_id, payload, change_reason=reason)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    return {"ok": True, "new_version": updated.version, "lesson": updated.model_dump()}
+
+
+@router.get("/lesson/{lesson_id}/history")
+async def get_lesson_history_endpoint(lesson_id: str):
+    history = db.get_lesson_history(lesson_id)
+    return {"history": history}
+
+
+@router.post("/lessons/raw")
+async def create_raw_lesson(payload: dict):
+    now = datetime.utcnow().isoformat()
+    lesson = LessonRecord(
+        id=str(uuid.uuid4()),
+        title=payload.get("title", "Untitled Observation"),
+        category=payload.get("category", "General"),
+        user_explanation=payload.get("user_explanation", ""),
+        ai_understanding=payload.get("ai_understanding", ""),
+        trading_rules=payload.get("trading_rules", []),
+        practical_examples=payload.get("practical_examples", []),
+        comparison_notes=payload.get("comparison_notes", ""),
+        clarifications_asked=payload.get("clarifications_asked", []),
+        status=payload.get("status", "pending"),
+        version=1,
+        source_document_id=payload.get("source_document_id"),
+        chart_image_path=payload.get("chart_image_path"),
+        created_at=now,
+        updated_at=now,
+        approved_at=now if payload.get("status") == "approved" else None
+    )
+    db.insert_lesson(lesson)
+    return {"ok": True, "lesson_id": lesson.id, "lesson": lesson.model_dump()}
 
 
 @router.delete("/lesson/{lesson_id}")

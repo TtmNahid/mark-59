@@ -485,6 +485,86 @@ class IntelligenceDatabase:
             conn.commit()
             return True
 
+    def update_lesson(self, lesson_id: str, updates: dict, change_reason: str = "Lesson revised") -> Optional[LessonRecord]:
+        existing = self.get_lesson(lesson_id)
+        if not existing:
+            return None
+        now = datetime.utcnow().isoformat()
+        new_version = existing.version + 1
+
+        title = updates.get("title", existing.title)
+        category = updates.get("category", existing.category)
+        user_explanation = updates.get("user_explanation", existing.user_explanation)
+        ai_understanding = updates.get("ai_understanding", existing.ai_understanding)
+        trading_rules = updates.get("trading_rules", existing.trading_rules)
+        practical_examples = updates.get("practical_examples", existing.practical_examples)
+        status = updates.get("status", existing.status)
+        chart_image_path = updates.get("chart_image_path", existing.chart_image_path)
+
+        with self._get_connection() as conn:
+            conn.execute("""
+                UPDATE lessons SET
+                    title = ?, category = ?, user_explanation = ?, ai_understanding = ?,
+                    trading_rules_json = ?, practical_examples_json = ?, status = ?,
+                    version = ?, chart_image_path = ?, updated_at = ?
+                WHERE id = ?;
+            """, (
+                title, category, user_explanation, ai_understanding,
+                json.dumps(trading_rules), json.dumps(practical_examples),
+                status, new_version, chart_image_path, now, lesson_id
+            ))
+
+            # Record in lesson_history table
+            conn.execute("""
+                INSERT INTO lesson_history
+                (id, lesson_id, version, title, category, user_explanation, ai_understanding, trading_rules_json, practical_examples_json, status, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """, (
+                str(uuid.uuid4()), lesson_id, new_version, title, category,
+                user_explanation, ai_understanding, json.dumps(trading_rules),
+                json.dumps(practical_examples), status, now
+            ))
+
+            # Re-index in FTS5
+            fts_content = f"{ai_understanding} {user_explanation} Rules: {' '.join(trading_rules)}"
+            conn.execute("""
+                INSERT OR REPLACE INTO intelligence_fts (id, entity_type, title, content, category)
+                VALUES (?, 'lesson', ?, ?, ?);
+            """, (lesson_id, title, fts_content, category))
+
+            self._log_audit(conn, "lesson", lesson_id, "update", {
+                "title": title, "version": new_version, "change_reason": change_reason
+            })
+            conn.commit()
+
+        return self.get_lesson(lesson_id)
+
+    def get_lesson_history(self, lesson_id: str) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM lesson_history WHERE lesson_id = ? ORDER BY version DESC;",
+                (lesson_id,)
+            )
+            rows = cursor.fetchall()
+            return [
+                {
+                    "id": r["id"],
+                    "lesson_id": r["lesson_id"],
+                    "version": r["version"],
+                    "title": r["title"],
+                    "category": r["category"],
+                    "user_explanation": r["user_explanation"],
+                    "ai_understanding": r["ai_understanding"],
+                    "trading_rules": json.loads(r["trading_rules_json"] or "[]"),
+                    "practical_examples": json.loads(r["practical_examples_json"] or "[]"),
+                    "status": r["status"],
+                    "changed_at": r["updated_at"],
+                    "change_reason": "Version update"
+                }
+                for r in rows
+            ]
+
     # ── Trade Learning Journal ────────────────────────────────────────────────
 
     def insert_trade(self, trade: TradeLearningRecord) -> None:
